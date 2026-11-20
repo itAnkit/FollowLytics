@@ -97,7 +97,8 @@ export const Catalog: React.FC<CatalogProps> = ({ vendorId }) => {
         description: formDesc.trim() || undefined,
         usageInstructions: formUsage.trim() || undefined
       };
-      await api.createProduct(newP);
+      const created = await api.createProduct(newP);
+      setProducts(prev => [created, ...prev]);
       setShowAddModal(false);
       resetForm();
       fetchProducts();

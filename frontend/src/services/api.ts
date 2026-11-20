@@ -104,10 +104,9 @@ export const api = {
 
   // Products & Catalog
   async getProducts(vendorId: number, search?: string): Promise<Product[]> {
-    const url = new URL(`${API_BASE}/products`);
-    url.searchParams.set('vendorId', vendorId.toString());
-    if (search) url.searchParams.set('search', search);
-    const res = await fetch(url.toString());
+    const params = new URLSearchParams({ vendorId: vendorId.toString() });
+    if (search) params.set('search', search);
+    const res = await fetch(`${API_BASE}/products?${params.toString()}`);
     if (!res.ok) throw new Error('Failed to fetch products');
     return res.json();
   },
