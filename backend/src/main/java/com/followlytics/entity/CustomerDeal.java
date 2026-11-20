@@ -35,6 +35,7 @@ public class CustomerDeal {
     private String summary;
 
     private Boolean isClosed = false;
+    private Boolean isTracked = true;
 
     private LocalDateTime lastInteractionAt;
     private LocalDateTime createdAt;
@@ -142,6 +143,14 @@ public class CustomerDeal {
 
     public void setIsClosed(Boolean isClosed) {
         this.isClosed = isClosed;
+    }
+
+    public Boolean getIsTracked() {
+        return isTracked != null ? isTracked : true;
+    }
+
+    public void setIsTracked(Boolean isTracked) {
+        this.isTracked = isTracked;
     }
 
     public LocalDateTime getLastInteractionAt() {

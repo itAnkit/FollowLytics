@@ -16,6 +16,7 @@ com\followlytics\dto\DashboardSummaryResponse$LeakedCategoryDto.class
 com\followlytics\dto\GeminiExtractionResult.class
 com\followlytics\dto\ChatProcessRequest.class
 com\followlytics\config\CorsConfig$1.class
+com\followlytics\config\SpaWebFilter.class
 com\followlytics\entity\Product.class
 com\followlytics\controller\ProductController.class
 com\followlytics\config\OpenApiConfig.class

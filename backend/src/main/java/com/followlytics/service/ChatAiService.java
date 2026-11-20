@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ChatAiService {
@@ -134,6 +135,67 @@ public class ChatAiService {
         response.setNeedsHumanAttention(Boolean.TRUE.equals(aiResult.getNeedsHumanAttention()));
 
         return response;
+    }
+
+    @Transactional
+    public CustomerDeal trackCustomer(String vendorPhone, Long vendorId, String customerPhone, String customerName, boolean isTracked, String recentContext) {
+        // 1. Resolve Vendor
+        Vendor vendor = null;
+        if (vendorId != null) {
+            vendor = vendorRepository.findById(vendorId).orElse(null);
+        }
+        if (vendor == null && vendorPhone != null && !vendorPhone.isBlank()) {
+            vendor = vendorRepository.findByPhone(vendorPhone).orElse(null);
+        }
+        if (vendor == null) {
+            vendor = vendorRepository.findAll().stream().findFirst().orElseGet(() -> createDefaultVendor(vendorPhone));
+        }
+
+        String custPhone = (customerPhone != null && !customerPhone.isBlank()) ? customerPhone : "Unknown Contact";
+        String custName = (customerName != null && !customerName.isBlank()) ? customerName : custPhone;
+
+        final Vendor finalVendor = vendor;
+        CustomerDeal deal = customerDealRepository.findByVendorIdAndCustomerPhone(vendor.getId(), custPhone)
+                .orElseGet(() -> {
+                    CustomerDeal d = new CustomerDeal(finalVendor.getId(), custPhone, custName);
+                    return customerDealRepository.save(d);
+                });
+
+        deal.setCustomerName(custName);
+        deal.setIsTracked(isTracked);
+        deal.setLastInteractionAt(LocalDateTime.now());
+
+        // If tracked and there is recent context, extract/analyze context if deal has no summary yet
+        if (isTracked && recentContext != null && !recentContext.isBlank()) {
+            deal.setSummary("WhatsApp: " + (recentContext.length() > 60 ? recentContext.substring(0, 57) + "..." : recentContext));
+            ChatMessage msg = new ChatMessage(deal.getId(), "CUSTOMER", recentContext);
+            chatMessageRepository.save(msg);
+            try {
+                List<Product> catalog = productRepository.findByVendorId(vendor.getId());
+                GeminiExtractionResult aiResult = geminiService.processCustomerMessage(vendor, catalog, "", recentContext);
+                if (aiResult.getDetectedStage() != null) {
+                    try { deal.setStage(DealStage.valueOf(aiResult.getDetectedStage().toUpperCase())); } catch (Exception ignored) {}
+                }
+                if (aiResult.getEstimatedDealValue() != null && aiResult.getEstimatedDealValue().compareTo(BigDecimal.ZERO) > 0) {
+                    deal.setDealValue(aiResult.getEstimatedDealValue());
+                }
+                if (aiResult.getProductMentioned() != null && !aiResult.getProductMentioned().isBlank()) {
+                    deal.setProductMentioned(aiResult.getProductMentioned());
+                    recordDemand(vendor.getId(), aiResult.getProductMentioned(), true);
+                }
+            } catch (Exception ignored) {}
+        }
+
+        return customerDealRepository.save(deal);
+    }
+
+    public Optional<CustomerDeal> getDealByCustomer(String vendorPhone, Long vendorId, String customerPhone) {
+        Vendor vendor = null;
+        if (vendorId != null) vendor = vendorRepository.findById(vendorId).orElse(null);
+        if (vendor == null && vendorPhone != null && !vendorPhone.isBlank()) vendor = vendorRepository.findByPhone(vendorPhone).orElse(null);
+        if (vendor == null) vendor = vendorRepository.findAll().stream().findFirst().orElse(null);
+        if (vendor == null || customerPhone == null) return Optional.empty();
+        return customerDealRepository.findByVendorIdAndCustomerPhone(vendor.getId(), customerPhone);
     }
 
     private void recordDemand(Long vendorId, String productName, boolean carriedInCatalog) {

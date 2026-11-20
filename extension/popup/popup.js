@@ -1,15 +1,23 @@
 document.addEventListener('DOMContentLoaded', () => {
   const phoneInput = document.getElementById('vendor-phone');
+  const backendUrlInput = document.getElementById('backend-url');
   const modeSelect = document.getElementById('default-mode');
   const saveBtn = document.getElementById('save-btn');
   const openDashBtn = document.getElementById('open-dash-btn');
   const statusBadge = document.getElementById('status-badge');
   const trackedCount = document.getElementById('tracked-count');
 
-  const BACKEND_URL = 'http://localhost:8080';
+  let currentBackendUrl = 'http://localhost:8080';
 
   // 1. Load from local extension storage
-  chrome.storage.local.get(['vendorPhone', 'storeName', 'defaultMode', 'trackedCustomers'], (res) => {
+  chrome.storage.local.get(['vendorPhone', 'storeName', 'defaultMode', 'trackedCustomers', 'backendUrl'], (res) => {
+    if (res.backendUrl) {
+      currentBackendUrl = res.backendUrl;
+      backendUrlInput.value = res.backendUrl;
+    } else {
+      backendUrlInput.value = currentBackendUrl;
+    }
+
     if (res.vendorPhone) {
       phoneInput.value = res.storeName ? `${res.vendorPhone} (${res.storeName})` : res.vendorPhone;
     } else {
@@ -22,14 +30,14 @@ document.addEventListener('DOMContentLoaded', () => {
     trackedCount.innerText = Object.keys(tracked).length;
 
     // 2. Fetch current active session from Backend to guarantee 100% real-time sync
-    syncWithBackendSession();
+    syncWithBackendSession(currentBackendUrl);
   });
 
-  function syncWithBackendSession() {
+  function syncWithBackendSession(baseUrl) {
     statusBadge.className = 'badge';
     statusBadge.innerText = 'Checking...';
 
-    fetch(`${BACKEND_URL}/api/auth/current`)
+    fetch(`${baseUrl}/api/auth/current`)
       .then(r => {
         if (r.status === 200) return r.json();
         return null;
@@ -45,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
           statusBadge.className = 'badge badge-online';
           statusBadge.innerText = 'Online ✓';
         } else {
-          checkBackendHealthOnly();
+          checkBackendHealthOnly(baseUrl);
         }
       })
       .catch(() => {
@@ -54,8 +62,8 @@ document.addEventListener('DOMContentLoaded', () => {
       });
   }
 
-  function checkBackendHealthOnly() {
-    fetch(`${BACKEND_URL}/api/analytics/health`)
+  function checkBackendHealthOnly(baseUrl) {
+    fetch(`${baseUrl}/api/analytics/health`)
       .then(r => r.json())
       .then(d => {
         if (d.status === 'UP') {
@@ -70,15 +78,24 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   saveBtn.onclick = () => {
+    let url = backendUrlInput.value.trim();
+    if (url.endsWith('/')) url = url.slice(0, -1);
+    if (!url.startsWith('http')) url = 'http://' + url;
+
     chrome.storage.local.set({
-      defaultMode: modeSelect.value
+      defaultMode: modeSelect.value,
+      backendUrl: url
     }, () => {
       saveBtn.innerText = 'Saved! ✓';
-      setTimeout(() => saveBtn.innerText = 'Save Mode', 1500);
+      syncWithBackendSession(url);
+      setTimeout(() => saveBtn.innerText = 'Save Settings', 1500);
     });
   };
 
   openDashBtn.onclick = () => {
-    chrome.tabs.create({ url: 'http://localhost:5173' });
+    chrome.storage.local.get(['backendUrl'], (res) => {
+      const url = res.backendUrl || 'http://localhost:5173';
+      chrome.tabs.create({ url });
+    });
   };
 });

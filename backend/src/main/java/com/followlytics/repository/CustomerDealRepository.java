@@ -17,12 +17,17 @@ public interface CustomerDealRepository extends JpaRepository<CustomerDeal, Long
 
     List<CustomerDeal> findByVendorIdOrderByLastInteractionAtDesc(Long vendorId);
 
+    List<CustomerDeal> findByVendorIdAndIsTrackedOrderByLastInteractionAtDesc(Long vendorId, Boolean isTracked);
+
     Optional<CustomerDeal> findByVendorIdAndCustomerPhone(Long vendorId, String customerPhone);
 
     List<CustomerDeal> findByVendorIdAndStage(Long vendorId, DealStage stage);
 
     @Query("SELECT COUNT(d) FROM CustomerDeal d WHERE d.vendorId = :vendorId")
     long countTotalDealsByVendor(@Param("vendorId") Long vendorId);
+
+    @Query("SELECT COUNT(d) FROM CustomerDeal d WHERE d.vendorId = :vendorId AND (d.isTracked IS NULL OR d.isTracked = true)")
+    long countTotalTrackedByVendor(@Param("vendorId") Long vendorId);
 
     @Query("SELECT COUNT(d) FROM CustomerDeal d WHERE d.vendorId = :vendorId AND d.stage = :stage")
     long countByVendorIdAndStage(@Param("vendorId") Long vendorId, @Param("stage") DealStage stage);

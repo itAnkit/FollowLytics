@@ -1,6 +1,6 @@
 // FollowLytics WhatsApp Web Content Script
 (function () {
-  console.log('[FollowLytics] Content script loaded on WhatsApp Web.');
+  console.log('[FollowLytics] Content script initialized on WhatsApp Web.');
 
   let currentChat = null;
   let trackedCustomers = {};
@@ -13,7 +13,7 @@
   // Safe storage wrappers to gracefully handle Chrome extension reload invalidations
   function safeStorageGet(keys, callback) {
     try {
-      if (chrome.runtime?.id && chrome.storage?.local) {
+      if (typeof chrome !== 'undefined' && chrome.runtime?.id && chrome.storage?.local) {
         chrome.storage.local.get(keys, callback);
         return;
       }
@@ -23,50 +23,55 @@
 
   function safeStorageSet(data) {
     try {
-      if (chrome.runtime?.id && chrome.storage?.local) {
+      if (typeof chrome !== 'undefined' && chrome.runtime?.id && chrome.storage?.local) {
         chrome.storage.local.set(data);
       }
     } catch (e) {
-      console.warn('[FollowLytics] Extension context invalidated. Running in-memory.');
+      console.warn('[FollowLytics] Extension storage unavailable. Operating in-memory.');
     }
   }
 
-  // Load stored preferences
+  // Load stored preferences & sync active merchant
   function loadSettings() {
     safeStorageGet(['trackedCustomers', 'defaultMode', 'backendUrl', 'vendorPhone'], (res) => {
       if (res.trackedCustomers) trackedCustomers = res.trackedCustomers;
       if (res.defaultMode) currentMode = res.defaultMode;
       if (res.backendUrl) backendUrl = res.backendUrl;
       if (res.vendorPhone) vendorPhone = res.vendorPhone;
-    });
 
-    // Also fetch active vendor from backend directly if available
+      // Query current active merchant from backend
+      fetchActiveMerchant();
+    });
+  }
+
+  function fetchActiveMerchant() {
     fetch(`${backendUrl}/api/auth/current`)
       .then(r => r.status === 200 ? r.json() : null)
       .then(v => {
         if (v && v.phone) {
           vendorPhone = v.phone;
-          safeStorageSet({ vendorPhone: v.phone });
+          safeStorageSet({ vendorPhone: v.phone, vendorId: v.id, storeName: v.storeName });
         }
       })
       .catch(() => {});
   }
+
   loadSettings();
 
-  // Listen for storage changes
+  // Listen for storage changes from popup or web-sync
   try {
-    if (chrome.storage?.onChanged) {
+    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
       chrome.storage.onChanged.addListener((changes) => {
         if (changes.trackedCustomers) trackedCustomers = changes.trackedCustomers.newValue || {};
         if (changes.defaultMode) currentMode = changes.defaultMode.newValue || 'COPILOT';
-        if (changes.backendUrl) backendUrl = changes.backendUrl.newValue || 'http://localhost:8080';
+        if (changes.backendUrl) backendUrl = changes.backendUrl.newValue || backendUrl;
         if (changes.vendorPhone) vendorPhone = changes.vendorPhone.newValue || vendorPhone;
         updateHeaderUI();
       });
     }
   } catch (e) {}
 
-  // Main DOM Observer
+  // Main DOM Observer to detect active chat and incoming messages
   const observer = new MutationObserver(() => {
     detectActiveChat();
     observeIncomingMessages();
@@ -88,15 +93,41 @@
     const contactName = titleEl ? (titleEl.getAttribute('title') || titleEl.innerText.trim()) : 'Customer';
 
     if (!currentChat || currentChat.name !== contactName) {
+      const cleanPhone = contactName.replace(/[^0-9+]/g, '') || contactName;
       currentChat = {
         name: contactName,
-        phone: contactName.replace(/[^0-9+]/g, '') || contactName,
+        phone: cleanPhone,
         headerElement: header
       };
       lastProcessedMsgText = '';
       removeCopilotCard();
       injectHeaderUI();
+
+      // Check real-time tracking status with backend
+      checkBackendTrackStatus(currentChat.phone, currentChat.name);
     }
+  }
+
+  // Check backend whether this customer is tracked
+  function checkBackendTrackStatus(phone, name) {
+    if (!phone) return;
+
+    callExtensionApi('GET_TRACK_STATUS', { customerPhone: phone, vendorPhone })
+      .then(res => {
+        if (res && res.isTracked !== undefined) {
+          if (res.isTracked) {
+            trackedCustomers[name] = true;
+          } else {
+            delete trackedCustomers[name];
+          }
+          safeStorageSet({ trackedCustomers });
+          updateHeaderUI();
+        }
+      })
+      .catch(() => {
+        // Fallback to local cache
+        updateHeaderUI();
+      });
   }
 
   // Inject or update header buttons
@@ -109,7 +140,7 @@
       container.id = 'followlytics-header-bar';
       container.className = 'followlytics-header-container';
 
-      // Insert right after contact info
+      // Insert right next to contact header details
       const targetAnchor = currentChat.headerElement.querySelector('div[role="button"]') || currentChat.headerElement.children[1] || currentChat.headerElement;
       targetAnchor.parentNode.insertBefore(container, targetAnchor.nextSibling);
     }
@@ -125,7 +156,7 @@
 
     if (!isTracked) {
       container.innerHTML = `
-        <button id="fl-btn-track" class="followlytics-btn-track" title="Track this chat in FollowLytics">
+        <button id="fl-btn-track" class="followlytics-btn-track" title="Track this customer conversation in FollowLytics">
           <span>✨ Track Customer</span>
         </button>
       `;
@@ -133,22 +164,47 @@
       const trackBtn = container.querySelector('#fl-btn-track');
       if (trackBtn) {
         trackBtn.onclick = () => {
-          trackedCustomers[currentChat.name] = {
-            trackedAt: new Date().toISOString(),
-            stage: 'INQUIRY'
+          trackBtn.innerHTML = '<span>⏳ Tracking...</span>';
+          trackBtn.disabled = true;
+
+          const recentContext = scrapeChatHistory();
+          const payload = {
+            customerPhone: currentChat.phone,
+            customerName: currentChat.name,
+            vendorPhone: vendorPhone,
+            isTracked: true,
+            recentContext: recentContext
           };
-          safeStorageSet({ trackedCustomers });
-          updateHeaderUI();
+
+          callExtensionApi('TRACK_CUSTOMER', payload)
+            .then(() => {
+              trackedCustomers[currentChat.name] = true;
+              safeStorageSet({ trackedCustomers });
+              updateHeaderUI();
+
+              // Trigger immediate Copilot suggestion if customer has an inquiry
+              const lastInquiry = getLastCustomerMessage();
+              if (lastInquiry) {
+                handleIncomingCustomerMessage(lastInquiry);
+              }
+            })
+            .catch(err => {
+              console.error('[FollowLytics] Track failed:', err);
+              // Set local anyway as fallback
+              trackedCustomers[currentChat.name] = true;
+              safeStorageSet({ trackedCustomers });
+              updateHeaderUI();
+            });
         };
       }
     } else {
       container.innerHTML = `
         <span class="followlytics-active-badge">⭐ FollowLytics Active</span>
-        <select id="fl-mode-select" class="followlytics-mode-select" title="Toggle Copilot or Autopilot">
+        <select id="fl-mode-select" class="followlytics-mode-select" title="Toggle AI Copilot or Autopilot">
           <option value="COPILOT" ${currentMode === 'COPILOT' ? 'selected' : ''}>Copilot (Draft)</option>
           <option value="AUTOPILOT" ${currentMode === 'AUTOPILOT' ? 'selected' : ''}>Autopilot (Auto)</option>
         </select>
-        <button id="fl-btn-untrack" class="followlytics-btn-dismiss" title="Stop tracking this contact" style="font-size:12px;">✕</button>
+        <button id="fl-btn-untrack" class="followlytics-btn-dismiss" title="Untrack this customer" style="font-size:11px; padding:3px 7px; border:1px solid #e5e7eb; border-radius:10px; background:#fff; cursor:pointer;">✕ Untrack</button>
       `;
 
       const modeSelect = container.querySelector('#fl-mode-select');
@@ -162,20 +218,52 @@
       const untrackBtn = container.querySelector('#fl-btn-untrack');
       if (untrackBtn) {
         untrackBtn.onclick = () => {
-          delete trackedCustomers[currentChat.name];
-          safeStorageSet({ trackedCustomers });
-          removeCopilotCard();
-          updateHeaderUI();
+          untrackBtn.innerText = '...';
+          const payload = {
+            customerPhone: currentChat.phone,
+            customerName: currentChat.name,
+            vendorPhone: vendorPhone,
+            isTracked: false
+          };
+
+          callExtensionApi('TRACK_CUSTOMER', payload)
+            .finally(() => {
+              delete trackedCustomers[currentChat.name];
+              safeStorageSet({ trackedCustomers });
+              removeCopilotCard();
+              updateHeaderUI();
+            });
         };
       }
     }
   }
 
-  // Observe incoming messages
+  // Scrape visible messages from WhatsApp Web chat DOM
+  function scrapeChatHistory() {
+    const messages = document.querySelectorAll('#main .message-in, #main .message-out');
+    const history = [];
+    messages.forEach(m => {
+      const isCustomer = m.classList.contains('message-in');
+      const textEl = m.querySelector('span.selectable-text, div.copyable-text span, span[dir="ltr"]');
+      if (textEl && textEl.innerText.trim()) {
+        history.push(`${isCustomer ? 'Customer' : 'Merchant'}: ${textEl.innerText.trim()}`);
+      }
+    });
+    return history.slice(-6).join('\n');
+  }
+
+  function getLastCustomerMessage() {
+    const incoming = document.querySelectorAll('#main .message-in');
+    if (!incoming || incoming.length === 0) return null;
+    const latest = incoming[incoming.length - 1];
+    const textEl = latest.querySelector('span.selectable-text, div.copyable-text span, span[dir="ltr"]');
+    return textEl ? textEl.innerText.trim() : null;
+  }
+
+  // Observe incoming messages in real-time
   function observeIncomingMessages() {
     if (!currentChat || !trackedCustomers[currentChat.name] || isProcessing) return;
 
-    // In WhatsApp Web, incoming messages have class 'message-in'
     const incomingMessages = document.querySelectorAll('#main .message-in');
     if (!incomingMessages || incomingMessages.length === 0) return;
 
@@ -186,7 +274,6 @@
     const text = textEl.innerText.trim();
     if (!text || text === lastProcessedMsgText) return;
 
-    // Check if this incoming message is newer than what we processed
     lastProcessedMsgText = text;
     handleIncomingCustomerMessage(text);
   }
@@ -206,26 +293,25 @@
       mode: currentMode
     };
 
-    callChatApi(payload)
+    callExtensionApi('PROCESS_CHAT_MESSAGE', payload)
       .then(data => {
         isProcessing = false;
         renderCopilotResponse(data);
       })
       .catch(err => {
         isProcessing = false;
-        renderCopilotError(err.message || 'Error processing response');
+        renderCopilotError(err.message || 'Error communicating with AI engine');
       });
   }
 
-  // Resilient API Caller (Tries Extension background worker, falls back to direct fetch)
-  function callChatApi(payload) {
+  // Unified API caller through background worker with direct fallback
+  function callExtensionApi(action, payload) {
     return new Promise((resolve, reject) => {
       try {
-        if (chrome.runtime?.id) {
-          chrome.runtime.sendMessage({ action: 'PROCESS_CHAT_MESSAGE', payload, backendUrl }, (res) => {
+        if (typeof chrome !== 'undefined' && chrome.runtime?.id) {
+          chrome.runtime.sendMessage({ action, payload, backendUrl }, (res) => {
             if (chrome.runtime.lastError || !res || !res.success) {
-              // Direct fetch fallback
-              directFetch(payload).then(resolve).catch(reject);
+              directApiFallback(action, payload).then(resolve).catch(reject);
             } else {
               resolve(res.data);
             }
@@ -234,28 +320,36 @@
         }
       } catch (e) {}
 
-      // Fallback
-      directFetch(payload).then(resolve).catch(reject);
+      directApiFallback(action, payload).then(resolve).catch(reject);
     });
   }
 
-  function directFetch(payload) {
-    return fetch(`${backendUrl}/api/chat/process`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    }).then(r => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    });
+  function directApiFallback(action, payload) {
+    if (action === 'PROCESS_CHAT_MESSAGE') {
+      return fetch(`${backendUrl}/api/chat/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(r => r.json());
+    }
+    if (action === 'TRACK_CUSTOMER') {
+      return fetch(`${backendUrl}/api/chat/track-customer`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }).then(r => r.json());
+    }
+    if (action === 'GET_TRACK_STATUS') {
+      return fetch(`${backendUrl}/api/chat/track-status?customerPhone=${encodeURIComponent(payload.customerPhone)}&vendorPhone=${encodeURIComponent(payload.vendorPhone || '')}`)
+        .then(r => r.json());
+    }
+    return Promise.reject(new Error('Unknown action'));
   }
 
   // Show Copilot Loading State
   function showCopilotLoading(prompt) {
     let card = document.getElementById('followlytics-copilot-card');
-    if (!card) {
-      card = createCopilotCard();
-    }
+    if (!card) card = createCopilotCard();
 
     card.innerHTML = `
       <div class="followlytics-copilot-header">
@@ -375,7 +469,6 @@
     if (!composer) return;
 
     composer.focus();
-    // Use document.execCommand for WhatsApp rich text synchronization
     document.execCommand('selectAll', false, null);
     document.execCommand('insertText', false, text);
 
@@ -388,12 +481,10 @@
     insertIntoComposer(text);
 
     setTimeout(() => {
-      // Find send button (appears after text is entered)
       const sendBtn = document.querySelector('#main footer button[data-testid="compose-btn-send"], #main footer span[data-icon="send"]');
       if (sendBtn) {
         sendBtn.click();
       } else {
-        // Fallback: Dispatch Enter key
         const composer = document.querySelector('#main footer div[contenteditable="true"]');
         if (composer) {
           const enterEvent = new KeyboardEvent('keydown', {

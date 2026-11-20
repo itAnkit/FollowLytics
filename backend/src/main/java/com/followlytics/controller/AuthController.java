@@ -51,6 +51,32 @@ public class AuthController {
         return ResponseEntity.ok(resp);
     }
 
+    @GetMapping("/check-phone")
+    public ResponseEntity<Map<String, Object>> checkPhone(@RequestParam String phone) {
+        if (phone == null || phone.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("exists", false, "isRegistered", false, "isOnboarded", false));
+        }
+        String cleanPhone = phone.trim();
+        java.util.Optional<Vendor> opt = vendorRepository.findByPhone(cleanPhone);
+        if (opt.isPresent()) {
+            Vendor v = opt.get();
+            long productCount = productRepository.findByVendorId(v.getId()).size();
+            boolean hasOnboarded = Boolean.TRUE.equals(v.getIsOnboarded())
+                    || productCount > 0
+                    || (v.getStoreName() != null && !v.getStoreName().equals("My Business") && !v.getStoreName().isBlank());
+            Map<String, Object> resp = new HashMap<>();
+            resp.put("exists", true);
+            resp.put("isRegistered", true);
+            resp.put("isOnboarded", hasOnboarded);
+            resp.put("storeName", v.getStoreName() != null ? v.getStoreName() : "My Business");
+            resp.put("phone", v.getPhone());
+            resp.put("vendorId", v.getId());
+            return ResponseEntity.ok(resp);
+        } else {
+            return ResponseEntity.ok(Map.of("exists", false, "isRegistered", false, "isOnboarded", false));
+        }
+    }
+
     @PostMapping("/verify-otp")
     public ResponseEntity<Map<String, Object>> verifyOtp(@RequestBody Map<String, String> body) {
         String phone = body.get("phone");
@@ -77,12 +103,28 @@ public class AuthController {
                     return vendorRepository.save(newV);
                 });
 
+        long productCount = productRepository.findByVendorId(vendor.getId()).size();
+        boolean alreadyOnboarded = Boolean.TRUE.equals(vendor.getIsOnboarded())
+                || productCount > 0
+                || (vendor.getStoreName() != null && !vendor.getStoreName().equals("My Business") && !vendor.getStoreName().isBlank());
+
+        if (alreadyOnboarded && !Boolean.TRUE.equals(vendor.getIsOnboarded())) {
+            vendor.setIsOnboarded(true);
+            vendor = vendorRepository.save(vendor);
+        }
+
         Map<String, Object> resp = new HashMap<>();
         resp.put("success", true);
         resp.put("vendor", vendor);
-        resp.put("isOnboarded", Boolean.TRUE.equals(vendor.getIsOnboarded()));
+        resp.put("isOnboarded", alreadyOnboarded);
         currentActiveVendor = vendor;
         return ResponseEntity.ok(resp);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Map<String, Object>> logout() {
+        currentActiveVendor = null;
+        return ResponseEntity.ok(Map.of("success", true, "message", "Logged out successfully"));
     }
 
     @PostMapping("/onboarding")

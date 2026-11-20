@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { Vendor } from '../types';
 import { api } from '../services/api';
-import { Store, ShieldCheck, Puzzle, Save, Check } from 'lucide-react';
+import { Store, ShieldCheck, Puzzle, Save, Check, LogOut, User } from 'lucide-react';
 
 interface SettingsProps {
   vendor: Vendor | null;
   onUpdateVendor: (v: Vendor) => void;
+  onLogout?: () => void;
 }
 
-export const Settings: React.FC<SettingsProps> = ({ vendor, onUpdateVendor }) => {
+export const Settings: React.FC<SettingsProps> = ({ vendor, onUpdateVendor, onLogout }) => {
   const [storeName, setStoreName] = useState(vendor?.storeName || 'Sharma Hardware & Electricals');
   const [upiId, setUpiId] = useState(vendor?.upiId || 'sharmahardware@upi');
   const [policies, setPolicies] = useState(vendor?.storePolicies || '');
@@ -124,6 +125,35 @@ export const Settings: React.FC<SettingsProps> = ({ vendor, onUpdateVendor }) =>
           </button>
         </div>
       </form>
+
+      {/* Account & Session Box */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl p-6 border border-gray-200 dark:border-gray-800 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4 transition-colors">
+        <div className="flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-950/40 text-rose-600 flex items-center justify-center shadow-sm flex-shrink-0">
+            <User className="w-6 h-6" />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-gray-900 dark:text-white">Active Merchant Account</h4>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              Logged in as <strong className="font-mono text-gray-800 dark:text-gray-200">{vendor?.phone}</strong> ({vendor?.storeName})
+            </p>
+          </div>
+        </div>
+        {onLogout && (
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm('Are you sure you want to sign out? You will need your phone number and OTP to log back in.')) {
+                onLogout();
+              }
+            }}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/40 dark:hover:bg-rose-900/60 border border-rose-200 dark:border-rose-800 text-rose-700 dark:text-rose-300 font-bold text-xs transition"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>Sign Out of FollowLytics</span>
+          </button>
+        )}
+      </div>
 
       {/* Extension Pairing Box */}
       <div className="bg-emerald-50 rounded-2xl p-6 border border-emerald-200 flex flex-col md:flex-row items-center justify-between gap-4">

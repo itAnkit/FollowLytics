@@ -2,6 +2,7 @@ E:\JSB\FollowLytics\backend\src\main\java\com\followlytics\dto\DashboardSummaryR
 E:\JSB\FollowLytics\backend\src\main\java\com\followlytics\repository\ChatMessageRepository.java
 E:\JSB\FollowLytics\backend\src\main\java\com\followlytics\dto\ProductDto.java
 E:\JSB\FollowLytics\backend\src\main\java\com\followlytics\entity\LeakedReason.java
+E:\JSB\FollowLytics\backend\src\main\java\com\followlytics\config\SpaWebFilter.java
 E:\JSB\FollowLytics\backend\src\main\java\com\followlytics\entity\CustomerDeal.java
 E:\JSB\FollowLytics\backend\src\main\java\com\followlytics\repository\VendorRepository.java
 E:\JSB\FollowLytics\backend\src\main\java\com\followlytics\controller\ChatAiController.java

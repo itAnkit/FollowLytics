@@ -4,6 +4,16 @@ const API_BASE = (import.meta as any).env?.VITE_API_URL || (typeof window !== 'u
 
 export const api = {
   // Auth & OTP
+  async checkPhone(phone: string): Promise<{ exists: boolean; isRegistered: boolean; isOnboarded: boolean; storeName?: string; vendorId?: number }> {
+    try {
+      const res = await fetch(`${API_BASE}/auth/check-phone?phone=${encodeURIComponent(phone)}`);
+      if (!res.ok) return { exists: false, isRegistered: false, isOnboarded: false };
+      return res.json();
+    } catch (e) {
+      return { exists: false, isRegistered: false, isOnboarded: false };
+    }
+  },
+
   async sendOtp(phone: string): Promise<{ success: boolean; message: string; otp: string }> {
     const res = await fetch(`${API_BASE}/auth/send-otp`, {
       method: 'POST',
@@ -76,6 +86,12 @@ export const api = {
     } catch (e) {}
   },
 
+  async logout(): Promise<void> {
+    try {
+      await fetch(`${API_BASE}/auth/logout`, { method: 'POST' });
+    } catch (e) {}
+  },
+
   // Products & Catalog
   async getProducts(vendorId: number, search?: string): Promise<Product[]> {
     const url = new URL(`${API_BASE}/products`);
@@ -111,6 +127,19 @@ export const api = {
     if (!res.ok) throw new Error('Failed to delete product');
   },
 
+  async uploadCsv(vendorId: number, csvContent: string): Promise<{ success: boolean; importedCount: number; products: Product[] }> {
+    const res = await fetch(`${API_BASE}/products/upload-csv?vendorId=${vendorId}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: csvContent
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ message: 'CSV upload failed' }));
+      throw new Error(err.message || 'Failed to upload CSV');
+    }
+    return res.json();
+  },
+
   // Analytics & Intelligence
   async getDashboard(vendorId: number): Promise<DashboardSummary> {
     const res = await fetch(`${API_BASE}/analytics/dashboard?vendorId=${vendorId}`);
@@ -122,6 +151,32 @@ export const api = {
   async getDeals(vendorId: number): Promise<CustomerDeal[]> {
     const res = await fetch(`${API_BASE}/chat/deals?vendorId=${vendorId}`);
     if (!res.ok) throw new Error('Failed to fetch deals');
+    return res.json();
+  },
+
+  async trackCustomer(payload: {
+    vendorPhone?: string;
+    vendorId?: number;
+    customerPhone: string;
+    customerName?: string;
+    isTracked: boolean;
+    recentContext?: string;
+  }): Promise<{ success: boolean; isTracked: boolean; deal: CustomerDeal }> {
+    const res = await fetch(`${API_BASE}/chat/track-customer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Failed to update tracking');
+    return res.json();
+  },
+
+  async getTrackStatus(customerPhone: string, vendorPhone?: string, vendorId?: number): Promise<{ isTracked: boolean; deal?: CustomerDeal }> {
+    const params = new URLSearchParams({ customerPhone });
+    if (vendorPhone) params.set('vendorPhone', vendorPhone);
+    if (vendorId) params.set('vendorId', vendorId.toString());
+    const res = await fetch(`${API_BASE}/chat/track-status?${params.toString()}`);
+    if (!res.ok) return { isTracked: false };
     return res.json();
   },
 

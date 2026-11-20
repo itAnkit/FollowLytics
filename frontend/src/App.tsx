@@ -186,6 +186,7 @@ export function App() {
               setVendor(v);
               localStorage.setItem('followlytics_vendor', JSON.stringify(v));
             }}
+            onLogout={handleLogout}
           />
         )}
       </main>

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "FollowLytics - WhatsApp Commerce AI & Analytics",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Transform WhatsApp Web into an AI sales assistant and commerce intelligence dashboard for merchants.",
   "permissions": [
     "storage",
@@ -9,7 +9,10 @@
   ],
   "host_permissions": [
     "https://web.whatsapp.com/*",
-    "http://localhost:8080/*"
+    "http://localhost:8080/*",
+    "http://127.0.0.1:8080/*",
+    "http://localhost:5173/*",
+    "https://*.run.app/*"
   ],
   "action": {
     "default_popup": "popup/popup.html",
@@ -23,7 +26,12 @@
       "run_at": "document_idle"
     },
     {
-      "matches": ["http://localhost:5173/*"],
+      "matches": [
+        "http://localhost:5173/*",
+        "http://localhost:8080/*",
+        "http://127.0.0.1:8080/*",
+        "https://*.run.app/*"
+      ],
       "js": ["content/web-sync.js"],
       "run_at": "document_idle"
     }

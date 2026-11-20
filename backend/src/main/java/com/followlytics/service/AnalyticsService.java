@@ -45,7 +45,7 @@ public class AnalyticsService {
         res.setStoreName(vendor.getStoreName());
         res.setCurrency(vendor.getCurrency() != null ? vendor.getCurrency() : "₹");
 
-        long totalDeals = customerDealRepository.countTotalDealsByVendor(vendor.getId());
+        long totalDeals = customerDealRepository.countTotalTrackedByVendor(vendor.getId());
         res.setTotalTrackedCustomers(totalDeals);
 
         long soldCount = customerDealRepository.countByVendorIdAndStage(vendor.getId(), DealStage.SOLD);

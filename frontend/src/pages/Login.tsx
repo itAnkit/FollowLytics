@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Store, Phone, ShieldCheck, ArrowRight, Sparkles, CheckCircle2, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Store, Phone, ShieldCheck, ArrowRight, Sparkles, CheckCircle2, AlertCircle, UserCheck, UserPlus } from 'lucide-react';
 import { api } from '../services/api';
 import { Vendor } from '../types';
 
@@ -14,6 +14,34 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [simulatedOtp, setSimulatedOtp] = useState<string | null>(null);
+  const [userStatus, setUserStatus] = useState<{
+    checked: boolean;
+    isRegistered: boolean;
+    isOnboarded: boolean;
+    storeName?: string;
+  }>({ checked: false, isRegistered: false, isOnboarded: false });
+
+  // Real-time phone registration check
+  useEffect(() => {
+    if (!phone || phone.trim().length < 8) {
+      setUserStatus({ checked: false, isRegistered: false, isOnboarded: false });
+      return;
+    }
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.checkPhone(phone.trim());
+        setUserStatus({
+          checked: true,
+          isRegistered: res.isRegistered,
+          isOnboarded: res.isOnboarded,
+          storeName: res.storeName
+        });
+      } catch (e) {
+        setUserStatus({ checked: false, isRegistered: false, isOnboarded: false });
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [phone]);
 
   const handleSendOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -46,6 +74,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
     setError(null);
     try {
       const res = await api.verifyOtp(phone.trim(), otp.trim());
+      // If already registered / onboarded, res.isOnboarded is true -> goes directly to Dashboard!
       onLoginSuccess(res.vendor, res.isOnboarded);
     } catch (err: any) {
       setError(err.message || 'Invalid OTP code');
@@ -119,6 +148,27 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
                   />
                 </div>
               </div>
+
+              {/* Real-time Account Status Chip */}
+              {userStatus.checked && (
+                userStatus.isRegistered ? (
+                  <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-200 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
+                    <UserCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="font-bold">Registered: {userStatus.storeName || 'Merchant'}</div>
+                      <p className="text-[11px] text-emerald-700/80 dark:text-emerald-300/80">Account exists. Directly signing into your dashboard.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-3 rounded-xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-sky-800 dark:text-sky-200 text-xs flex items-center gap-2.5 animate-in fade-in duration-200">
+                    <UserPlus className="w-4 h-4 text-sky-600 flex-shrink-0" />
+                    <div className="flex-1">
+                      <div className="font-bold">New Merchant Account</div>
+                      <p className="text-[11px] text-sky-700/80 dark:text-sky-300/80">Verify with OTP to set up your WhatsApp store.</p>
+                    </div>
+                  </div>
+                )
+              )}
 
               <button
                 type="submit"

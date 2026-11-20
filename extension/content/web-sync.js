@@ -1,17 +1,23 @@
-// FollowLytics Web Sync Script (Injected on http://localhost:5173/*)
+// FollowLytics Web Sync Script (Injected on FollowLytics Web Apps)
 (function () {
   function syncSession() {
     try {
       const stored = localStorage.getItem('followlytics_vendor');
+      let currentBackendUrl = window.location.origin;
+      if (window.location.port === '5173') {
+        currentBackendUrl = 'http://localhost:8080';
+      }
+
       if (stored) {
         const vendor = JSON.parse(stored);
         if (vendor && vendor.phone) {
           chrome.storage.local.set({
             vendorPhone: vendor.phone,
             vendorId: vendor.id,
-            storeName: vendor.storeName
+            storeName: vendor.storeName,
+            backendUrl: currentBackendUrl
           }, () => {
-            console.log('[FollowLytics Extension] Synced active merchant from Web App:', vendor.phone);
+            console.log('[FollowLytics Extension] Synced active merchant from Web App:', vendor.phone, 'Backend:', currentBackendUrl);
           });
         }
       } else {
@@ -34,6 +40,6 @@
     }
   });
 
-  // Periodic safety check every 5 seconds while web app is open
-  setInterval(syncSession, 5000);
+  // Periodic safety check every 4 seconds while web app is open
+  setInterval(syncSession, 4000);
 })();

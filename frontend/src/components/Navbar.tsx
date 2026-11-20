@@ -104,11 +104,16 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               {/* Logout Button */}
               <button
-                onClick={onLogout}
-                className="p-2 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
-                title="Sign Out / Switch Business"
+                onClick={() => {
+                  if (confirm('Are you sure you want to sign out?')) {
+                    onLogout();
+                  }
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs font-bold transition"
+                title="Sign Out of FollowLytics"
               >
-                <LogOut className="w-4 h-4" />
+                <LogOut className="w-3.5 h-3.5 text-rose-500" />
+                <span className="hidden sm:inline">Sign Out</span>
               </button>
             </div>
           </div>

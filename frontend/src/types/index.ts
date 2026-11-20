@@ -39,6 +39,7 @@ export interface CustomerDeal {
   productMentioned?: string;
   summary?: string;
   isClosed: boolean;
+  isTracked?: boolean;
   lastInteractionAt: string;
   createdAt: string;
 }

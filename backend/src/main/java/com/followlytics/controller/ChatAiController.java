@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -37,6 +38,38 @@ public class ChatAiController {
     public ResponseEntity<ChatProcessResponse> processMessage(@RequestBody ChatProcessRequest request) {
         ChatProcessResponse response = chatAiService.processIncomingMessage(request);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/track-customer")
+    public ResponseEntity<Map<String, Object>> trackCustomer(@RequestBody Map<String, Object> body) {
+        String vendorPhone = body.get("vendorPhone") != null ? body.get("vendorPhone").toString() : null;
+        Long vendorId = body.get("vendorId") != null ? Long.valueOf(body.get("vendorId").toString()) : null;
+        String customerPhone = body.get("customerPhone") != null ? body.get("customerPhone").toString() : null;
+        String customerName = body.get("customerName") != null ? body.get("customerName").toString() : null;
+        boolean isTracked = body.containsKey("isTracked") ? Boolean.parseBoolean(body.get("isTracked").toString()) : true;
+        String recentContext = body.get("recentContext") != null ? body.get("recentContext").toString() : null;
+
+        CustomerDeal deal = chatAiService.trackCustomer(vendorPhone, vendorId, customerPhone, customerName, isTracked, recentContext);
+        Map<String, Object> resp = new HashMap<>();
+        resp.put("success", true);
+        resp.put("isTracked", Boolean.TRUE.equals(deal.getIsTracked()));
+        resp.put("deal", deal);
+        return ResponseEntity.ok(resp);
+    }
+
+    @GetMapping("/track-status")
+    public ResponseEntity<Map<String, Object>> getTrackStatus(
+            @RequestParam(required = false) String vendorPhone,
+            @RequestParam(required = false) Long vendorId,
+            @RequestParam String customerPhone) {
+        return chatAiService.getDealByCustomer(vendorPhone, vendorId, customerPhone)
+                .map(deal -> {
+                    Map<String, Object> resp = new HashMap<>();
+                    resp.put("isTracked", Boolean.TRUE.equals(deal.getIsTracked()));
+                    resp.put("deal", deal);
+                    return ResponseEntity.ok(resp);
+                })
+                .orElseGet(() -> ResponseEntity.ok(Map.of("isTracked", false)));
     }
 
     @GetMapping("/deals")

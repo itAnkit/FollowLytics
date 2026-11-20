@@ -135,6 +135,16 @@ export const Onboarding: React.FC<OnboardingProps> = ({ vendor, onOnboardingComp
               <span>2. Product Catalogue</span>
             </div>
           </div>
+
+          <div className="mt-3">
+            <button
+              type="button"
+              onClick={() => onOnboardingComplete({ ...vendor, isOnboarded: true })}
+              className="text-xs text-gray-500 hover:text-emerald-600 dark:text-gray-400 dark:hover:text-emerald-400 font-semibold underline transition"
+            >
+              Skip setup & go straight to Dashboard →
+            </button>
+          </div>
         </div>
 
         {error && (

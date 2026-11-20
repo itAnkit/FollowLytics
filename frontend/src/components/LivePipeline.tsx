@@ -17,8 +17,25 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
 
   const filteredDeals = deals.filter(d => {
     if (filter === 'ALL') return true;
+    if (filter === 'TRACKED') return d.isTracked !== false;
+    if (filter === 'UNTRACKED') return d.isTracked === false;
     return d.stage === filter;
   });
+
+  const handleToggleTrack = async (deal: CustomerDeal) => {
+    try {
+      const newStatus = !(deal.isTracked !== false);
+      await api.trackCustomer({
+        customerPhone: deal.customerPhone,
+        customerName: deal.customerName,
+        vendorId: deal.vendorId,
+        isTracked: newStatus
+      });
+      onRefresh();
+    } catch (e) {
+      alert('Failed to update tracking');
+    }
+  };
 
   const getStageBadge = (stage: DealStage) => {
     switch (stage) {
@@ -69,8 +86,8 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
         </div>
 
         {/* Filter Pills */}
-        <div className="flex gap-1.5 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
-          {['ALL', 'INQUIRY', 'PRICE_QUOTED', 'SOLD', 'LOST'].map((f) => (
+        <div className="flex flex-wrap gap-1.5 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
+          {['ALL', 'TRACKED', 'UNTRACKED', 'INQUIRY', 'PRICE_QUOTED', 'SOLD', 'LOST'].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -110,7 +127,18 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
               filteredDeals.map((deal) => (
                 <tr key={deal.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition group">
                   <td className="py-3.5 px-4">
-                    <div className="font-bold text-gray-900 dark:text-white">{deal.customerName}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-gray-900 dark:text-white">{deal.customerName}</span>
+                      {deal.isTracked !== false ? (
+                        <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-1.5 py-0.5 rounded">
+                          Tracked
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-1.5 py-0.5 rounded">
+                          Untracked
+                        </span>
+                      )}
+                    </div>
                     <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
                       <Phone className="w-3 h-3" />
                       <span>{deal.customerPhone}</span>
@@ -164,6 +192,18 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
                           Lost ✕
                         </button>
                       )}
+
+                      <button
+                        onClick={() => handleToggleTrack(deal)}
+                        className={`px-2 py-1 rounded-lg text-xs font-bold border transition ${
+                          deal.isTracked !== false
+                            ? 'text-gray-500 hover:text-rose-600 bg-gray-50 hover:bg-rose-50 dark:bg-gray-800 dark:hover:bg-rose-950/60 border-gray-200 dark:border-gray-700'
+                            : 'text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/60 hover:bg-emerald-100 border-emerald-200 dark:border-emerald-800'
+                        }`}
+                        title={deal.isTracked !== false ? 'Untrack Customer' : 'Track Customer'}
+                      >
+                        {deal.isTracked !== false ? 'Untrack' : 'Track +'}
+                      </button>
                     </div>
                   </td>
                 </tr>
