@@ -93,8 +93,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   openDashBtn.onclick = () => {
-    chrome.storage.local.get(['backendUrl'], (res) => {
-      const url = res.backendUrl || 'http://localhost:5173';
+    chrome.storage.local.get(['dashboardUrl', 'backendUrl'], (res) => {
+      let url = res.dashboardUrl;
+      if (!url) {
+        url = (res.backendUrl && !res.backendUrl.includes(':8080')) ? res.backendUrl : 'http://localhost:5173';
+      }
       chrome.tabs.create({ url });
     });
   };

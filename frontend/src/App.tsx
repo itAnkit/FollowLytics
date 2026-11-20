@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Navbar } from './components/Navbar';
 import { Dashboard } from './pages/Dashboard';
 import { Catalog } from './pages/Catalog';
-import { Simulator } from './pages/Simulator';
 import { Settings } from './pages/Settings';
 import { LivePipeline } from './components/LivePipeline';
 import { Login } from './pages/Login';
@@ -170,13 +169,6 @@ export function App() {
               onRefresh={refreshDeals}
             />
           </div>
-        )}
-
-        {currentTab === 'simulator' && (
-          <Simulator
-            vendorId={vendor.id}
-            onRefreshDashboard={refreshDeals}
-          />
         )}
 
         {currentTab === 'settings' && (

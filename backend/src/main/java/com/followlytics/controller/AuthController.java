@@ -8,6 +8,7 @@ import com.followlytics.entity.StockStatus;
 import com.followlytics.entity.Vendor;
 import com.followlytics.repository.ProductRepository;
 import com.followlytics.repository.VendorRepository;
+import com.followlytics.service.GeminiService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,14 +23,20 @@ public class AuthController {
 
     private final VendorRepository vendorRepository;
     private final ProductRepository productRepository;
+    private final GeminiService geminiService;
     // In-memory freeware OTP store (phone -> OTP)
     private final Map<String, String> otpStore = new ConcurrentHashMap<>();
     // Tracks current active merchant session for extension sync
     private static volatile Vendor currentActiveVendor = null;
 
-    public AuthController(VendorRepository vendorRepository, ProductRepository productRepository) {
+    public static Vendor getCurrentActiveVendor() {
+        return currentActiveVendor;
+    }
+
+    public AuthController(VendorRepository vendorRepository, ProductRepository productRepository, GeminiService geminiService) {
         this.vendorRepository = vendorRepository;
         this.productRepository = productRepository;
+        this.geminiService = geminiService;
     }
 
     @PostMapping("/send-otp")
@@ -239,8 +246,19 @@ public class AuthController {
                     if (req.getStoreName() != null) v.setStoreName(req.getStoreName());
                     if (req.getUpiId() != null) v.setUpiId(req.getUpiId());
                     if (req.getStorePolicies() != null) v.setStorePolicies(req.getStorePolicies());
-                    return ResponseEntity.ok(vendorRepository.save(v));
+                    if (req.getGeminiApiKey() != null) v.setGeminiApiKey(req.getGeminiApiKey().trim());
+                    if (req.getGeminiModel() != null) v.setGeminiModel(req.getGeminiModel().trim());
+                    Vendor saved = vendorRepository.save(v);
+                    currentActiveVendor = saved;
+                    return ResponseEntity.ok(saved);
                 })
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/test-gemini")
+    public ResponseEntity<Map<String, Object>> testGemini(@RequestBody Map<String, String> body) {
+        String key = body.get("apiKey");
+        String model = body.getOrDefault("model", "auto");
+        return ResponseEntity.ok(geminiService.testApiKey(key, model));
     }
 }

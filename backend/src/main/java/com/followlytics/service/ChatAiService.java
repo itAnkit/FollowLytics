@@ -1,5 +1,6 @@
 package com.followlytics.service;
 
+import com.followlytics.controller.AuthController;
 import com.followlytics.dto.ChatProcessRequest;
 import com.followlytics.dto.ChatProcessResponse;
 import com.followlytics.dto.GeminiExtractionResult;
@@ -40,18 +41,7 @@ public class ChatAiService {
     @Transactional
     public ChatProcessResponse processIncomingMessage(ChatProcessRequest request) {
         // 1. Resolve Vendor
-        Vendor vendor = null;
-        if (request.getVendorId() != null) {
-            vendor = vendorRepository.findById(request.getVendorId()).orElse(null);
-        }
-        if (vendor == null && request.getVendorPhone() != null) {
-            vendor = vendorRepository.findByPhone(request.getVendorPhone()).orElse(null);
-        }
-        if (vendor == null) {
-            // Default fallback to first vendor if neither matches
-            List<Vendor> all = vendorRepository.findAll();
-            vendor = all.isEmpty() ? createDefaultVendor(request.getVendorPhone()) : all.get(0);
-        }
+        Vendor vendor = resolveVendor(request.getVendorId(), request.getVendorPhone(), true);
 
         // 2. Resolve Customer Deal
         String custPhone = (request.getCustomerPhone() != null && !request.getCustomerPhone().isBlank()) 
@@ -118,7 +108,13 @@ public class ChatAiService {
             }
         }
 
-        deal.setSummary("Latest: " + (request.getMessage().length() > 60 ? request.getMessage().substring(0, 57) + "..." : request.getMessage()));
+        String shortMsg = request.getMessage().length() > 60 ? request.getMessage().substring(0, 57) + "..." : request.getMessage();
+        if (Boolean.TRUE.equals(aiResult.getNeedsHumanAttention())) {
+            deal.setNeedsAction(true);
+            deal.setSummary("⚠️ Action Needed: " + shortMsg);
+        } else {
+            deal.setSummary("Latest: " + shortMsg);
+        }
         deal.setLastInteractionAt(LocalDateTime.now());
         customerDealRepository.save(deal);
 
@@ -140,16 +136,7 @@ public class ChatAiService {
     @Transactional
     public CustomerDeal trackCustomer(String vendorPhone, Long vendorId, String customerPhone, String customerName, boolean isTracked, String recentContext) {
         // 1. Resolve Vendor
-        Vendor vendor = null;
-        if (vendorId != null) {
-            vendor = vendorRepository.findById(vendorId).orElse(null);
-        }
-        if (vendor == null && vendorPhone != null && !vendorPhone.isBlank()) {
-            vendor = vendorRepository.findByPhone(vendorPhone).orElse(null);
-        }
-        if (vendor == null) {
-            vendor = vendorRepository.findAll().stream().findFirst().orElseGet(() -> createDefaultVendor(vendorPhone));
-        }
+        Vendor vendor = resolveVendor(vendorId, vendorPhone, true);
 
         String custPhone = (customerPhone != null && !customerPhone.isBlank()) ? customerPhone : "Unknown Contact";
         String custName = (customerName != null && !customerName.isBlank()) ? customerName : custPhone;
@@ -190,12 +177,35 @@ public class ChatAiService {
     }
 
     public Optional<CustomerDeal> getDealByCustomer(String vendorPhone, Long vendorId, String customerPhone) {
-        Vendor vendor = null;
-        if (vendorId != null) vendor = vendorRepository.findById(vendorId).orElse(null);
-        if (vendor == null && vendorPhone != null && !vendorPhone.isBlank()) vendor = vendorRepository.findByPhone(vendorPhone).orElse(null);
-        if (vendor == null) vendor = vendorRepository.findAll().stream().findFirst().orElse(null);
+        Vendor vendor = resolveVendor(vendorId, vendorPhone, false);
         if (vendor == null || customerPhone == null) return Optional.empty();
         return customerDealRepository.findByVendorIdAndCustomerPhone(vendor.getId(), customerPhone);
+    }
+
+    /** Resolves vendor by explicit ID, explicit phone, active logged-in session, or database fallback. */
+    private Vendor resolveVendor(Long vendorId, String vendorPhone, boolean createIfMissing) {
+        Vendor vendor = null;
+        if (vendorId != null) {
+            vendor = vendorRepository.findById(vendorId).orElse(null);
+        }
+        if (vendor == null && vendorPhone != null && !vendorPhone.isBlank()) {
+            vendor = vendorRepository.findByPhone(vendorPhone.trim()).orElse(null);
+        }
+        if (vendor == null) {
+            Vendor active = AuthController.getCurrentActiveVendor();
+            if (active != null && active.getId() != null) {
+                vendor = vendorRepository.findById(active.getId()).orElse(active);
+            }
+        }
+        if (vendor == null) {
+            List<Vendor> all = vendorRepository.findAll();
+            if (!all.isEmpty()) {
+                vendor = all.get(0);
+            } else if (createIfMissing) {
+                vendor = createDefaultVendor(vendorPhone);
+            }
+        }
+        return vendor;
     }
 
     private void recordDemand(Long vendorId, String productName, boolean carriedInCatalog) {

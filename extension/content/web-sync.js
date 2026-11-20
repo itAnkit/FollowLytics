@@ -1,9 +1,18 @@
 // FollowLytics Web Sync Script (Injected on FollowLytics Web Apps)
 (function () {
+  let syncInterval = null;
+
   function syncSession() {
     try {
+      // Stop cleanly if extension was reloaded/invalidated
+      if (typeof chrome === 'undefined' || !chrome.runtime?.id || !chrome.storage?.local) {
+        if (syncInterval) clearInterval(syncInterval);
+        return;
+      }
+
       const stored = localStorage.getItem('followlytics_vendor');
-      let currentBackendUrl = window.location.origin;
+      const dashboardUrl = window.location.origin;
+      let currentBackendUrl = dashboardUrl;
       if (window.location.port === '5173') {
         currentBackendUrl = 'http://localhost:8080';
       }
@@ -15,17 +24,20 @@
             vendorPhone: vendor.phone,
             vendorId: vendor.id,
             storeName: vendor.storeName,
-            backendUrl: currentBackendUrl
-          }, () => {
-            console.log('[FollowLytics Extension] Synced active merchant from Web App:', vendor.phone, 'Backend:', currentBackendUrl);
+            backendUrl: currentBackendUrl,
+            dashboardUrl: dashboardUrl
           });
         }
       } else {
-        // User logged out
+        // User logged out (still keep dashboardUrl & backendUrl synced to current app origin)
+        chrome.storage.local.set({ dashboardUrl: dashboardUrl, backendUrl: currentBackendUrl });
         chrome.storage.local.remove(['vendorPhone', 'vendorId', 'storeName']);
       }
     } catch (e) {
-      console.error('[FollowLytics Extension] Sync error:', e);
+      // Ignore context invalidation if extension reloaded
+      if (e?.message?.includes('invalidated') && syncInterval) {
+        clearInterval(syncInterval);
+      }
     }
   }
 
@@ -41,5 +53,5 @@
   });
 
   // Periodic safety check every 4 seconds while web app is open
-  setInterval(syncSession, 4000);
+  syncInterval = setInterval(syncSession, 4000);
 })();

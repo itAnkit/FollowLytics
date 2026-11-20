@@ -25,7 +25,6 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'catalog', label: 'Product Catalog', icon: Package },
     { id: 'pipeline', label: 'Deals & Customers', icon: Users },
-    { id: 'simulator', label: 'WhatsApp Simulator', icon: MessageSquare },
     { id: 'settings', label: 'Store Settings', icon: Settings },
   ];
 

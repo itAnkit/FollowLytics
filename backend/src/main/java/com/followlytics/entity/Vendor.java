@@ -26,6 +26,10 @@ public class Vendor {
 
     private Boolean isOnboarded = false;
 
+    private String geminiApiKey;
+
+    private String geminiModel = "auto";
+
     private LocalDateTime createdAt;
 
     public Vendor() {
@@ -100,6 +104,22 @@ public class Vendor {
 
     public void setIsOnboarded(Boolean isOnboarded) {
         this.isOnboarded = isOnboarded;
+    }
+
+    public String getGeminiApiKey() {
+        return geminiApiKey;
+    }
+
+    public void setGeminiApiKey(String geminiApiKey) {
+        this.geminiApiKey = geminiApiKey;
+    }
+
+    public String getGeminiModel() {
+        return geminiModel != null ? geminiModel : "auto";
+    }
+
+    public void setGeminiModel(String geminiModel) {
+        this.geminiModel = geminiModel;
     }
 
     public LocalDateTime getCreatedAt() {

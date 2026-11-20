@@ -36,6 +36,7 @@ public class CustomerDeal {
 
     private Boolean isClosed = false;
     private Boolean isTracked = true;
+    private Boolean needsAction = false;
 
     private LocalDateTime lastInteractionAt;
     private LocalDateTime createdAt;
@@ -151,6 +152,14 @@ public class CustomerDeal {
 
     public void setIsTracked(Boolean isTracked) {
         this.isTracked = isTracked;
+    }
+
+    public Boolean getNeedsAction() {
+        return Boolean.TRUE.equals(needsAction);
+    }
+
+    public void setNeedsAction(Boolean needsAction) {
+        this.needsAction = needsAction;
     }
 
     public LocalDateTime getLastInteractionAt() {

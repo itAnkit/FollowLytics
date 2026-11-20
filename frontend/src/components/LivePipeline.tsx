@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CustomerDeal, DealStage, LeakedReason, ChatMessage } from '../types';
-import { Check, X, MessageSquare, ChevronRight, Phone, Clock, DollarSign } from 'lucide-react';
+import { Check, X, MessageSquare, ChevronRight, Phone, Clock, DollarSign, Trash2 } from 'lucide-react';
 import { api } from '../services/api';
 
 interface LivePipelineProps {
@@ -15,12 +15,34 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [loadingChat, setLoadingChat] = useState<boolean>(false);
 
+  const actionNeededCount = deals.filter(d => d.needsAction).length;
+
   const filteredDeals = deals.filter(d => {
     if (filter === 'ALL') return true;
+    if (filter === 'ACTION_NEEDED') return !!d.needsAction;
     if (filter === 'TRACKED') return d.isTracked !== false;
     if (filter === 'UNTRACKED') return d.isTracked === false;
     return d.stage === filter;
   });
+
+  const handleResolveAction = async (dealId: number) => {
+    try {
+      await api.updateDealStage(dealId, undefined, undefined, undefined, false);
+      onRefresh();
+    } catch (e) {
+      alert('Failed to resolve action');
+    }
+  };
+
+  const handleDeleteDeal = async (dealId: number) => {
+    if (!confirm('Remove this customer entry from pipeline?')) return;
+    try {
+      await api.deleteDeal(dealId);
+      onRefresh();
+    } catch (e) {
+      alert('Failed to remove customer deal');
+    }
+  };
 
   const handleToggleTrack = async (deal: CustomerDeal) => {
     try {
@@ -87,17 +109,21 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
 
         {/* Filter Pills */}
         <div className="flex flex-wrap gap-1.5 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
-          {['ALL', 'TRACKED', 'UNTRACKED', 'INQUIRY', 'PRICE_QUOTED', 'SOLD', 'LOST'].map((f) => (
+          {['ALL', 'ACTION_NEEDED', 'TRACKED', 'UNTRACKED', 'INQUIRY', 'PRICE_QUOTED', 'SOLD', 'LOST'].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
               className={`px-3 py-1 rounded-lg text-xs font-bold transition ${
                 filter === f
-                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  ? f === 'ACTION_NEEDED'
+                    ? 'bg-amber-500 text-white shadow-sm'
+                    : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : f === 'ACTION_NEEDED' && actionNeededCount > 0
+                  ? 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40'
                   : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white'
               }`}
             >
-              {f.replace('_', ' ')}
+              {f === 'ACTION_NEEDED' ? `🚨 Action Needed (${actionNeededCount})` : f.replace('_', ' ')}
             </button>
           ))}
         </div>
@@ -125,10 +151,19 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
               </tr>
             ) : (
               filteredDeals.map((deal) => (
-                <tr key={deal.id} className="hover:bg-gray-50/80 dark:hover:bg-gray-800/40 transition group">
+                <tr key={deal.id} className={`transition group ${
+                  deal.needsAction
+                    ? 'bg-amber-50/70 dark:bg-amber-950/20 hover:bg-amber-100/70 dark:hover:bg-amber-950/30'
+                    : 'hover:bg-gray-50/80 dark:hover:bg-gray-800/40'
+                }`}>
                   <td className="py-3.5 px-4">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span className="font-bold text-gray-900 dark:text-white">{deal.customerName}</span>
+                      {deal.needsAction && (
+                        <span className="text-[10px] font-extrabold text-amber-800 dark:text-amber-200 bg-amber-200 dark:bg-amber-900/80 px-2 py-0.5 rounded-full animate-pulse">
+                          🚨 Action Needed
+                        </span>
+                      )}
                       {deal.isTracked !== false ? (
                         <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-950 px-1.5 py-0.5 rounded">
                           Tracked
@@ -173,6 +208,16 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
                         <MessageSquare className="w-4 h-4" />
                       </button>
 
+                      {deal.needsAction && (
+                        <button
+                          onClick={() => handleResolveAction(deal.id)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-bold text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-900/60 hover:bg-amber-200 border border-amber-300 dark:border-amber-700 transition"
+                          title="Mark 1-on-1 Attention Resolved"
+                        >
+                          Resolve ✓
+                        </button>
+                      )}
+
                       {deal.stage !== 'SOLD' && (
                         <button
                           onClick={() => handleStatusChange(deal.id, 'SOLD')}
@@ -203,6 +248,14 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
                         title={deal.isTracked !== false ? 'Untrack Customer' : 'Track Customer'}
                       >
                         {deal.isTracked !== false ? 'Untrack' : 'Track +'}
+                      </button>
+
+                      <button
+                        onClick={() => handleDeleteDeal(deal.id)}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition"
+                        title="Delete Entry"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </td>

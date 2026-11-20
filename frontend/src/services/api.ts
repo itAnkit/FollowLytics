@@ -76,6 +76,16 @@ export const api = {
     return res.json();
   },
 
+  async testGeminiKey(apiKey: string, model = 'auto'): Promise<{ valid: boolean; model?: string; message: string }> {
+    const res = await fetch(`${API_BASE}/auth/test-gemini`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ apiKey, model })
+    });
+    if (!res.ok) throw new Error('Failed to test Gemini key');
+    return res.json();
+  },
+
   async setCurrentSession(vendorId: number): Promise<void> {
     try {
       await fetch(`${API_BASE}/auth/current`, {
@@ -186,14 +196,19 @@ export const api = {
     return res.json();
   },
 
-  async updateDealStage(dealId: number, stage: string, dealValue?: number, leakedReason?: string): Promise<CustomerDeal> {
+  async updateDealStage(dealId: number, stage?: string, dealValue?: number, leakedReason?: string, needsAction?: boolean): Promise<CustomerDeal> {
     const res = await fetch(`${API_BASE}/chat/deals/${dealId}/stage`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stage, dealValue, leakedReason })
+      body: JSON.stringify({ stage, dealValue, leakedReason, needsAction })
     });
     if (!res.ok) throw new Error('Failed to update deal stage');
     return res.json();
+  },
+
+  async deleteDeal(dealId: number): Promise<void> {
+    const res = await fetch(`${API_BASE}/chat/deals/${dealId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to delete customer deal');
   },
 
   // Process message (Chat AI Simulator)

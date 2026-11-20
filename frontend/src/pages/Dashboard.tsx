@@ -5,7 +5,7 @@ import { LeakedRevenueChart } from '../components/LeakedRevenueChart';
 import { DemandRadar } from '../components/DemandRadar';
 import { LivePipeline } from '../components/LivePipeline';
 import { api } from '../services/api';
-import { RefreshCw, Sparkles } from 'lucide-react';
+import { RefreshCw, Sparkles, AlertTriangle } from 'lucide-react';
 
 interface DashboardProps {
   vendorId: number;
@@ -81,6 +81,25 @@ export const Dashboard: React.FC<DashboardProps> = ({ vendorId, onNavigateToCata
           <span>Refresh Live Data</span>
         </button>
       </div>
+
+      {/* Action Needed Escalation Banner */}
+      {summary && summary.recentDeals && summary.recentDeals.some(d => d.needsAction) && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-800 rounded-2xl p-4 flex flex-wrap items-center justify-between gap-3 shadow-sm animate-in fade-in duration-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-extrabold text-amber-900 dark:text-amber-200">
+                🚨 Action Needed: {summary.recentDeals.filter(d => d.needsAction).length} Customer(s) Requested 1-on-1 Attention
+              </h4>
+              <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+                {summary.recentDeals.filter(d => d.needsAction).map(d => d.customerName || d.customerPhone).join(', ')} — AI sent: "Allow some moment, will discuss in sometime."
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Top 4 KPI Metric Cards */}
       <MetricCards summary={summary} />

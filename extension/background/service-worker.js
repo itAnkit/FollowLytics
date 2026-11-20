@@ -24,9 +24,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'PROCESS_CHAT_MESSAGE') {
       const payload = {
         ...request.payload,
-        vendorPhone: request.payload.vendorPhone || stored.vendorPhone,
-        vendorId: request.payload.vendorId || stored.vendorId
+        vendorPhone: stored.vendorPhone || request.payload.vendorPhone,
+        vendorId: stored.vendorId || request.payload.vendorId
       };
+      console.log('[FollowLytics SW] Forwarding chat message to', baseUrl, payload);
 
       fetch(`${baseUrl}/api/chat/process`, {
         method: 'POST',
@@ -49,9 +50,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'TRACK_CUSTOMER') {
       const payload = {
         ...request.payload,
-        vendorPhone: request.payload.vendorPhone || stored.vendorPhone,
-        vendorId: request.payload.vendorId || stored.vendorId
+        vendorPhone: stored.vendorPhone || request.payload.vendorPhone,
+        vendorId: stored.vendorId || request.payload.vendorId
       };
+      console.log('[FollowLytics SW] Forwarding track customer to', baseUrl, payload);
 
       fetch(`${baseUrl}/api/chat/track-customer`, {
         method: 'POST',
@@ -80,6 +82,15 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
       fetch(`${baseUrl}/api/chat/track-status?${params.toString()}`)
         .then(res => res.json())
+        .then(data => sendResponse({ success: true, data }))
+        .catch(err => sendResponse({ success: false, error: err.message }));
+
+      return true;
+    }
+
+    if (request.action === 'GET_CURRENT_VENDOR') {
+      fetch(`${baseUrl}/api/auth/current`)
+        .then(res => res.status === 200 ? res.json() : null)
         .then(data => sendResponse({ success: true, data }))
         .catch(err => sendResponse({ success: false, error: err.message }));
 

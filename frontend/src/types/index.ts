@@ -10,6 +10,8 @@ export interface Vendor {
   currency?: string;
   storePolicies?: string;
   isOnboarded?: boolean;
+  geminiApiKey?: string;
+  geminiModel?: string;
   createdAt?: string;
 }
 
@@ -40,6 +42,7 @@ export interface CustomerDeal {
   summary?: string;
   isClosed: boolean;
   isTracked?: boolean;
+  needsAction?: boolean;
   lastInteractionAt: string;
   createdAt: string;
 }

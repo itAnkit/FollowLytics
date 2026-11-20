@@ -5,6 +5,8 @@ public class VendorAuthRequest {
     private String storeName;
     private String upiId;
     private String storePolicies;
+    private String geminiApiKey;
+    private String geminiModel;
 
     public VendorAuthRequest() {
     }
@@ -17,4 +19,8 @@ public class VendorAuthRequest {
     public void setUpiId(String upiId) { this.upiId = upiId; }
     public String getStorePolicies() { return storePolicies; }
     public void setStorePolicies(String storePolicies) { this.storePolicies = storePolicies; }
+    public String getGeminiApiKey() { return geminiApiKey; }
+    public void setGeminiApiKey(String geminiApiKey) { this.geminiApiKey = geminiApiKey; }
+    public String getGeminiModel() { return geminiModel; }
+    public void setGeminiModel(String geminiModel) { this.geminiModel = geminiModel; }
 }
