@@ -1,0 +1,348 @@
+import React, { useState, useEffect } from 'react';
+import { Product, StockStatus } from '../types';
+import { api } from '../services/api';
+import { Plus, Search, Tag, Trash2, Edit3, Check, AlertCircle, Package } from 'lucide-react';
+
+interface CatalogProps {
+  vendorId: number;
+}
+
+export const Catalog: React.FC<CatalogProps> = ({ vendorId }) => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  // Form State
+  const [formName, setFormName] = useState('');
+  const [formCategory, setFormCategory] = useState('General');
+  const [formPrice, setFormPrice] = useState('');
+  const [formImageUrl, setFormImageUrl] = useState('');
+  const [formStock, setFormStock] = useState<StockStatus>('IN_STOCK');
+  const [formDesc, setFormDesc] = useState('');
+  const [formUsage, setFormUsage] = useState('');
+  const [formSku, setFormSku] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const data = await api.getProducts(vendorId, search);
+      setProducts(data);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchProducts();
+  }, [vendorId, search]);
+
+  const handleStockToggle = async (product: Product, newStatus: StockStatus) => {
+    if (!product.id) return;
+    try {
+      await api.updateProduct(product.id, { stockStatus: newStatus });
+      setProducts(products.map(p => p.id === product.id ? { ...p, stockStatus: newStatus } : p));
+    } catch (e) {
+      alert('Failed to update stock status');
+    }
+  };
+
+  const handleDelete = async (id?: number) => {
+    if (!id || !confirm('Are you sure you want to delete this product?')) return;
+    try {
+      await api.deleteProduct(id);
+      setProducts(products.filter(p => p.id !== id));
+    } catch (e) {
+      alert('Failed to delete product');
+    }
+  };
+
+  const handleCreateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formName || !formPrice) return;
+
+    setSaving(true);
+    try {
+      const newP: Product = {
+        vendorId,
+        name: formName,
+        category: formCategory,
+        price: parseFloat(formPrice),
+        imageUrl: formImageUrl.trim() || undefined,
+        stockStatus: formStock,
+        sku: formSku,
+        description: formDesc,
+        usageInstructions: formUsage
+      };
+      await api.createProduct(newP);
+      setShowAddModal(false);
+      resetForm();
+      fetchProducts();
+    } catch (e) {
+      alert('Failed to save product');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFormName('');
+    setFormCategory('General');
+    setFormPrice('');
+    setFormStock('IN_STOCK');
+    setFormDesc('');
+    setFormUsage('');
+    setFormSku('');
+  };
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+      {/* Header */}
+      <div className="flex flex-wrap justify-between items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
+            <Package className="w-6 h-6 text-emerald-600" />
+            Product & Pricing Catalog
+          </h1>
+          <p className="text-xs text-gray-500 mt-0.5">
+            FollowLytics AI references these exact prices, specifications, and usage instructions when answering customers on WhatsApp.
+          </p>
+        </div>
+
+        <button
+          onClick={() => setShowAddModal(true)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition"
+        >
+          <Plus className="w-4 h-4" />
+          <span>Add New Product</span>
+        </button>
+      </div>
+
+      {/* Search & Stats Bar */}
+      <div className="flex justify-between items-center gap-4 bg-white p-3.5 rounded-2xl border border-gray-200 shadow-sm">
+        <div className="relative flex-1 max-w-md">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search products by name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-4 py-2 text-xs bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500"
+          />
+        </div>
+        <div className="text-xs text-gray-500 font-semibold">
+          Total Products: <span className="text-gray-900 font-bold">{products.length}</span>
+        </div>
+      </div>
+
+      {/* Products Grid */}
+      {loading ? (
+        <div className="text-center py-12 text-xs text-gray-400">Loading catalog...</div>
+      ) : products.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-gray-300 p-8">
+          <Package className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+          <h3 className="text-sm font-bold text-gray-700">No products found</h3>
+          <p className="text-xs text-gray-400 mt-1 mb-4">Add your store products so AI can quote prices and usage instructions.</p>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="px-4 py-2 bg-emerald-600 text-white font-bold text-xs rounded-lg"
+          >
+            Add First Product
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {products.map((p) => {
+            const isOutOfStock = p.stockStatus === 'OUT_OF_STOCK';
+            return (
+              <div
+                key={p.id}
+                className={`bg-white dark:bg-gray-900 rounded-2xl p-5 border shadow-sm flex flex-col justify-between transition ${
+                  isOutOfStock ? 'border-rose-200 dark:border-rose-900 bg-rose-50/20' : 'border-gray-200 dark:border-gray-800 hover:border-emerald-300'
+                }`}
+              >
+                <div>
+                  {p.imageUrl && (
+                    <div className="w-full h-36 rounded-xl overflow-hidden mb-3 bg-gray-100 dark:bg-gray-800">
+                      <img src={p.imageUrl} alt={p.name} className="w-full h-full object-cover" />
+                    </div>
+                  )}
+
+                  <div className="flex justify-between items-start gap-2 mb-2">
+                    <span className="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                      {p.category || 'General'}
+                    </span>
+                    <button
+                      onClick={() => handleDelete(p.id)}
+                      className="text-gray-300 hover:text-rose-600 p-1 rounded transition"
+                      title="Delete Product"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <h3 className="text-sm font-bold text-gray-900 line-clamp-1">{p.name}</h3>
+                  <div className="text-lg font-black text-emerald-700 mt-1">₹{p.price.toLocaleString()}</div>
+
+                  {p.description && (
+                    <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-relaxed">
+                      {p.description}
+                    </p>
+                  )}
+
+                  {p.usageInstructions && (
+                    <div className="mt-3 p-2.5 rounded-xl bg-gray-50 border border-gray-100 text-[11px] text-gray-600">
+                      <strong className="text-gray-800 block mb-0.5">💡 Usage Instructions for AI:</strong>
+                      <span className="line-clamp-2">{p.usageInstructions}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Stock Status Selector */}
+                <div className="mt-4 pt-3 border-t border-gray-100 flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-gray-500">Stock:</span>
+                  <select
+                    value={p.stockStatus}
+                    onChange={(e) => handleStockToggle(p, e.target.value as StockStatus)}
+                    className={`text-xs font-bold px-2 py-1 rounded-lg border outline-none cursor-pointer ${
+                      p.stockStatus === 'IN_STOCK'
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        : p.stockStatus === 'LOW_STOCK'
+                        ? 'bg-amber-50 text-amber-800 border-amber-200'
+                        : 'bg-rose-50 text-rose-800 border-rose-200'
+                    }`}
+                  >
+                    <option value="IN_STOCK">In Stock ✓</option>
+                    <option value="LOW_STOCK">Low Stock ⚠️</option>
+                    <option value="OUT_OF_STOCK">Out of Stock ✕</option>
+                  </select>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Add Product Modal */}
+      {showAddModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-base font-bold text-gray-900">Add Product to Store</h3>
+              <button onClick={() => setShowAddModal(false)} className="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+            </div>
+
+            <form onSubmit={handleCreateProduct} className="space-y-3.5 text-xs">
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">Product Title *</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Waterproof Silicone Sealant 300ml"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">Price (₹) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    required
+                    placeholder="320"
+                    value={formPrice}
+                    onChange={(e) => setFormPrice(e.target.value)}
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="font-bold text-gray-700 block mb-1">Category</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Chemicals / Tools"
+                    value={formCategory}
+                    onChange={(e) => setFormCategory(e.target.value)}
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="font-bold text-gray-700 dark:text-gray-300 block mb-1">
+                  Product Image URL <span className="text-gray-400 font-normal">(Optional)</span>
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://example.com/product.jpg"
+                  value={formImageUrl}
+                  onChange={(e) => setFormImageUrl(e.target.value)}
+                  className="w-full p-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl focus:border-emerald-500 focus:outline-none font-mono"
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-gray-700 dark:text-gray-300 block mb-1">Stock Status</label>
+                <select
+                  value={formStock}
+                  onChange={(e) => setFormStock(e.target.value as StockStatus)}
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                >
+                  <option value="IN_STOCK">In Stock</option>
+                  <option value="LOW_STOCK">Low Stock</option>
+                  <option value="OUT_OF_STOCK">Out of Stock</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">Specifications & Description</label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Clear acetic silicone for bathroom & kitchen glass joints. Anti-fungal."
+                  value={formDesc}
+                  onChange={(e) => setFormDesc(e.target.value)}
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                ></textarea>
+              </div>
+
+              <div>
+                <label className="font-bold text-gray-700 block mb-1">
+                  Product Usage Instructions (What the AI tells the customer)
+                </label>
+                <textarea
+                  rows={2}
+                  placeholder="e.g. Clean surface thoroughly. Apply with caulking gun. Skins over in 10 mins, fully cured in 24 hours."
+                  value={formUsage}
+                  onChange={(e) => setFormUsage(e.target.value)}
+                  className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:border-emerald-500 focus:outline-none"
+                ></textarea>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 bg-gray-100 text-gray-700 font-bold rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md"
+                >
+                  {saving ? 'Saving...' : 'Add Product'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
