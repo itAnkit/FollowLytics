@@ -1,6 +1,6 @@
 import { DashboardSummary, Product, Vendor, CustomerDeal, ChatMessage } from '../types';
 
-const API_BASE = import.meta.env.VITE_API_URL || (window.location.port === '5173' ? 'http://localhost:8080/api' : '/api');
+const API_BASE = (import.meta as any).env?.VITE_API_URL || (typeof window !== 'undefined' && window.location.port === '5173' ? 'http://localhost:8080/api' : '/api');
 
 export const api = {
   // Auth & OTP
