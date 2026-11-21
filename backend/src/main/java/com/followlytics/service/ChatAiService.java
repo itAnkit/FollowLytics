@@ -101,11 +101,9 @@ public class ChatAiService {
         if (aiResult.getUnmetDemandItem() != null && !aiResult.getUnmetDemandItem().isBlank()) {
             recordDemand(vendor.getId(), aiResult.getUnmetDemandItem(), false);
         }
-        if (aiResult.getIsDealClosed() != null) {
-            deal.setIsClosed(aiResult.getIsDealClosed());
-            if (aiResult.getIsDealClosed()) {
-                deal.setStage(DealStage.SOLD);
-            }
+        if (Boolean.TRUE.equals(aiResult.getIsDealClosed())) {
+            deal.setStage(DealStage.SOLD);
+            deal.setNeedsAction(false);
         }
 
         String shortMsg = request.getMessage().length() > 60 ? request.getMessage().substring(0, 57) + "..." : request.getMessage();

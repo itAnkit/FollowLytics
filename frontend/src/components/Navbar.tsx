@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Store, BarChart3, Package, Users, MessageSquare, Settings, Puzzle, Sun, Moon, LogOut, Phone } from 'lucide-react';
+import { Store, BarChart3, Package, Users, MessageSquare, Settings, Puzzle, Sun, Moon, LogOut, Phone, FileText } from 'lucide-react';
 import { Vendor } from '../types';
 
 interface NavbarProps {
@@ -25,6 +25,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
     { id: 'catalog', label: 'Product Catalog', icon: Package },
     { id: 'pipeline', label: 'Deals & Customers', icon: Users },
+    { id: 'reports', label: 'Reports', icon: FileText },
     { id: 'settings', label: 'Store Settings', icon: Settings },
   ];
 

@@ -195,11 +195,19 @@ export const api = {
     return res.json();
   },
 
-  async updateDealStage(dealId: number, stage?: string, dealValue?: number, leakedReason?: string, needsAction?: boolean): Promise<CustomerDeal> {
+  async updateDealStage(
+    dealId: number,
+    stage?: string,
+    dealValue?: number,
+    leakedReason?: string,
+    needsAction?: boolean,
+    isDelivered?: boolean,
+    isClosed?: boolean
+  ): Promise<CustomerDeal> {
     const res = await fetch(`${API_BASE}/chat/deals/${dealId}/stage`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ stage, dealValue, leakedReason, needsAction })
+      body: JSON.stringify({ stage, dealValue, leakedReason, needsAction, isDelivered, isClosed })
     });
     if (!res.ok) throw new Error('Failed to update deal stage');
     return res.json();

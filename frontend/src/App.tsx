@@ -3,6 +3,7 @@ import { Navbar } from './components/Navbar';
 import { Dashboard } from './pages/Dashboard';
 import { Catalog } from './pages/Catalog';
 import { Settings } from './pages/Settings';
+import { Reports } from './pages/Reports';
 import { LivePipeline } from './components/LivePipeline';
 import { Login } from './pages/Login';
 import { Onboarding } from './pages/Onboarding';
@@ -169,6 +170,10 @@ export function App() {
               onRefresh={refreshDeals}
             />
           </div>
+        )}
+
+        {currentTab === 'reports' && (
+          <Reports vendor={vendor} />
         )}
 
         {currentTab === 'settings' && (

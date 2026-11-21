@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { CustomerDeal, DealStage, LeakedReason, ChatMessage } from '../types';
-import { Check, X, MessageSquare, ChevronRight, Phone, Clock, DollarSign, Trash2 } from 'lucide-react';
+import { Check, X, MessageSquare, ChevronRight, Phone, Clock, DollarSign, Trash2, PackageCheck } from 'lucide-react';
 import { api } from '../services/api';
 
 interface LivePipelineProps {
@@ -20,10 +20,22 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
   const filteredDeals = deals.filter(d => {
     if (filter === 'ALL') return true;
     if (filter === 'ACTION_NEEDED') return !!d.needsAction;
+    if (filter === 'OPEN') return !d.isClosed && !d.isDelivered;
+    if (filter === 'CLOSED') return !!d.isClosed || !!d.isDelivered;
     if (filter === 'TRACKED') return d.isTracked !== false;
     if (filter === 'UNTRACKED') return d.isTracked === false;
     return d.stage === filter;
   });
+
+  const handleToggleDelivered = async (deal: CustomerDeal) => {
+    try {
+      const nextVal = !(deal.isDelivered || deal.isClosed);
+      await api.updateDealStage(deal.id, undefined, undefined, undefined, nextVal ? false : undefined, nextVal, nextVal);
+      onRefresh();
+    } catch (e) {
+      alert('Failed to update delivery status');
+    }
+  };
 
   const handleResolveAction = async (dealId: number) => {
     try {
@@ -109,7 +121,7 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
 
         {/* Filter Pills */}
         <div className="flex flex-wrap gap-1.5 bg-gray-100 dark:bg-gray-800 p-1 rounded-xl">
-          {['ALL', 'ACTION_NEEDED', 'TRACKED', 'UNTRACKED', 'INQUIRY', 'PRICE_QUOTED', 'SOLD', 'LOST'].map((f) => (
+          {['ALL', 'ACTION_NEEDED', 'OPEN', 'CLOSED', 'TRACKED', 'UNTRACKED', 'INQUIRY', 'PRICE_QUOTED', 'SOLD', 'LOST'].map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
@@ -138,6 +150,7 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
               <th className="py-3 px-4">Stage</th>
               <th className="py-3 px-4">Target Product</th>
               <th className="py-3 px-4">Deal Value</th>
+              <th className="py-3 px-4">Item Delivered / Picked Up</th>
               <th className="py-3 px-4">Latest AI Summary</th>
               <th className="py-3 px-4 text-right">Quick Actions</th>
             </tr>
@@ -145,7 +158,7 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
           <tbody className="divide-y divide-gray-100 dark:divide-gray-800 text-sm">
             {filteredDeals.length === 0 ? (
               <tr>
-                <td colSpan={6} className="py-8 text-center text-gray-400 text-xs">
+                <td colSpan={7} className="py-8 text-center text-gray-400 text-xs">
                   No customer deals matching "{filter}".
                 </td>
               </tr>
@@ -192,6 +205,22 @@ export const LivePipeline: React.FC<LivePipelineProps> = ({ deals, currency, onR
                         Lost: {deal.leakedReason}
                       </span>
                     )}
+                  </td>
+                  <td className="py-3.5 px-4">
+                    <label className={`inline-flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-bold cursor-pointer select-none transition ${
+                      deal.isDelivered || deal.isClosed
+                        ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                        : 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700 hover:border-emerald-400'
+                    }`}>
+                      <input
+                        type="checkbox"
+                        checked={!!(deal.isDelivered || deal.isClosed)}
+                        onChange={() => handleToggleDelivered(deal)}
+                        className="w-3.5 h-3.5 accent-emerald-600 rounded cursor-pointer"
+                      />
+                      <PackageCheck className="w-3.5 h-3.5" />
+                      <span>{deal.isDelivered || deal.isClosed ? 'Closed ✓' : 'Mark Delivered'}</span>
+                    </label>
                   </td>
                   <td className="py-3.5 px-4">
                     <span className="text-xs text-gray-600 dark:text-gray-300 line-clamp-1 max-w-xs">

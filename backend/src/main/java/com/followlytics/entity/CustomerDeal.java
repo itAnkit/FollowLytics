@@ -35,8 +35,12 @@ public class CustomerDeal {
     private String summary;
 
     private Boolean isClosed = false;
+    private Boolean isDelivered = false;
     private Boolean isTracked = true;
     private Boolean needsAction = false;
+
+    @Transient
+    private Long messageCount = 0L;
 
     private LocalDateTime lastInteractionAt;
     private LocalDateTime createdAt;
@@ -144,6 +148,22 @@ public class CustomerDeal {
 
     public void setIsClosed(Boolean isClosed) {
         this.isClosed = isClosed;
+    }
+
+    public Boolean getIsDelivered() {
+        return Boolean.TRUE.equals(isDelivered);
+    }
+
+    public void setIsDelivered(Boolean isDelivered) {
+        this.isDelivered = isDelivered;
+    }
+
+    public Long getMessageCount() {
+        return messageCount != null ? messageCount : 0L;
+    }
+
+    public void setMessageCount(Long messageCount) {
+        this.messageCount = messageCount;
     }
 
     public Boolean getIsTracked() {

@@ -41,8 +41,10 @@ export interface CustomerDeal {
   productMentioned?: string;
   summary?: string;
   isClosed: boolean;
+  isDelivered?: boolean;
   isTracked?: boolean;
   needsAction?: boolean;
+  messageCount?: number;
   lastInteractionAt: string;
   createdAt: string;
 }

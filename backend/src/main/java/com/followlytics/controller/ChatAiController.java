@@ -81,7 +81,18 @@ public class ChatAiController {
 
     @GetMapping("/deals")
     public ResponseEntity<List<CustomerDeal>> getDeals(@RequestParam Long vendorId) {
-        return ResponseEntity.ok(customerDealRepository.findByVendorIdOrderByLastInteractionAtDesc(vendorId));
+        List<CustomerDeal> deals = customerDealRepository.findByVendorIdOrderByLastInteractionAtDesc(vendorId);
+        if (!deals.isEmpty()) {
+            List<Long> ids = deals.stream().map(CustomerDeal::getId).toList();
+            Map<Long, Long> counts = new HashMap<>();
+            for (Object[] row : chatMessageRepository.countMessagesByDealIds(ids)) {
+                counts.put(((Number) row[0]).longValue(), ((Number) row[1]).longValue());
+            }
+            for (CustomerDeal d : deals) {
+                d.setMessageCount(counts.getOrDefault(d.getId(), 0L));
+            }
+        }
+        return ResponseEntity.ok(deals);
     }
 
     @GetMapping("/deals/{id}/messages")
@@ -96,9 +107,19 @@ public class ChatAiController {
                     if (body.containsKey("stage") && body.get("stage") != null) {
                         deal.setStage(DealStage.valueOf(body.get("stage").toString().toUpperCase()));
                         if (deal.getStage() == DealStage.SOLD) {
-                            deal.setIsClosed(true);
                             deal.setNeedsAction(false);
                         }
+                    }
+                    if (body.containsKey("isDelivered") && body.get("isDelivered") != null) {
+                        boolean delivered = Boolean.parseBoolean(body.get("isDelivered").toString());
+                        deal.setIsDelivered(delivered);
+                        deal.setIsClosed(delivered);
+                        if (delivered) {
+                            deal.setNeedsAction(false);
+                        }
+                    }
+                    if (body.containsKey("isClosed") && body.get("isClosed") != null) {
+                        deal.setIsClosed(Boolean.parseBoolean(body.get("isClosed").toString()));
                     }
                     if (body.containsKey("needsAction") && body.get("needsAction") != null) {
                         deal.setNeedsAction(Boolean.parseBoolean(body.get("needsAction").toString()));
@@ -106,7 +127,7 @@ public class ChatAiController {
                     if (body.containsKey("dealValue") && body.get("dealValue") != null) {
                         deal.setDealValue(new BigDecimal(body.get("dealValue").toString()));
                     }
-                    if (body.containsKey("leakedReason")) {
+                    if (body.containsKey("leakedReason") && body.get("leakedReason") != null) {
                         deal.setLeakedReason(LeakedReason.valueOf(body.get("leakedReason").toString().toUpperCase()));
                     }
                     deal.setLastInteractionAt(LocalDateTime.now());
